@@ -32,7 +32,6 @@ export const getInterviewPrepData = async (field: InterviewField): Promise<Inter
                     }
                 }
             });
-            // Access text as a property, not a method
             const dynamicQuestions = JSON.parse(response.text || "[]").map((q: any) => ({ ...q, field }));
             return [...fieldQuestions, ...dynamicQuestions];
         } catch (e) {
@@ -48,7 +47,6 @@ export const getDeepAnalysisFeedback = async (transcript: string): Promise<Inter
         model: 'gemini-3-pro-preview',
         contents: `Act as a brutal but fair technical interviewer. Analyze this transcript and provide critical feedback: \n\n${transcript}`,
         config: {
-            // Set both maxOutputTokens and thinkingConfig.thinkingBudget at the same time to ensure response space
             maxOutputTokens: 10000,
             thinkingConfig: { thinkingBudget: 8000 },
             responseMimeType: 'application/json',
@@ -64,7 +62,6 @@ export const getDeepAnalysisFeedback = async (transcript: string): Promise<Inter
             }
         }
     });
-    // Access text as a property
     return JSON.parse(response.text || "{}") as InterviewFeedback;
 };
 
@@ -85,7 +82,6 @@ export const calculateResumeStrength = async (resume: ParsedResume): Promise<{ s
             }
         }
     });
-    // Access text as a property
     return JSON.parse(response.text || '{"score":0, "tips": []}');
 };
 
@@ -116,6 +112,9 @@ export const getChatInstance = (): Chat => {
 }
 
 export const parseResumeWithGemini = async (file: File): Promise<ParsedResume> => {
+  if (!process.env.API_KEY) {
+    throw new Error("An API Key must be set when running in a browser");
+  }
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const model = 'gemini-3-flash-preview';
   const base64Data = await fileToBase64(file);
@@ -145,6 +144,5 @@ export const parseResumeWithGemini = async (file: File): Promise<ParsedResume> =
         }
     }
   });
-  // Access text as a property
   return JSON.parse(response.text || "{}") as ParsedResume;
 };

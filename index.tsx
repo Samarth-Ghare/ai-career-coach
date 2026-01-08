@@ -3,10 +3,12 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 
-// Extend the Window interface to include lucide
+// Extend the Window interface to include lucide and the pre-defined AIStudio type
+// The compiler expects window.aistudio to be of type AIStudio to match existing global declarations in the environment.
 declare global {
   interface Window {
     lucide: any;
+    aistudio: AIStudio;
   }
 }
 
