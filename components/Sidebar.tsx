@@ -1,5 +1,6 @@
 
 import React from 'react';
+// Correct import from react-router-dom for navigation links
 import { NavLink } from 'react-router-dom';
 
 const navItems = [

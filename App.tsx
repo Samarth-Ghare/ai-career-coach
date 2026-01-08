@@ -1,5 +1,6 @@
 
 import React, { useEffect } from 'react';
+// Correct imports from react-router-dom for main application routing
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './hooks/useAuth';

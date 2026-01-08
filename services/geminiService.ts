@@ -1,14 +1,17 @@
+
 import { GoogleGenAI, Chat, GenerateContentResponse, Type, Modality } from "@google/genai";
 import { ParsedResume, InterviewQuestion, InterviewFeedback, InterviewField } from '../types';
 import { fileToBase64 } from '../utils/helpers';
 import { STATIC_INTERVIEW_QUESTIONS } from './mockInterviewData';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Move GoogleGenAI instantiation inside each function to comply with the requirement 
+// of creating a new instance right before making an API call to use the most up-to-date API key.
 
 export const getInterviewPrepData = async (field: InterviewField): Promise<InterviewQuestion[]> => {
     const fieldQuestions = STATIC_INTERVIEW_QUESTIONS.filter(q => q.field === field);
     if (fieldQuestions.length < 10) {
         try {
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
                 contents: `Generate 10 advanced interview questions for the field of ${field}.`,
@@ -29,6 +32,7 @@ export const getInterviewPrepData = async (field: InterviewField): Promise<Inter
                     }
                 }
             });
+            // Access text as a property, not a method
             const dynamicQuestions = JSON.parse(response.text || "[]").map((q: any) => ({ ...q, field }));
             return [...fieldQuestions, ...dynamicQuestions];
         } catch (e) {
@@ -39,11 +43,12 @@ export const getInterviewPrepData = async (field: InterviewField): Promise<Inter
 };
 
 export const getDeepAnalysisFeedback = async (transcript: string): Promise<InterviewFeedback> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
         contents: `Act as a brutal but fair technical interviewer. Analyze this transcript and provide critical feedback: \n\n${transcript}`,
         config: {
-            // Fix: Set both maxOutputTokens and thinkingConfig.thinkingBudget at the same time to ensure response space
+            // Set both maxOutputTokens and thinkingConfig.thinkingBudget at the same time to ensure response space
             maxOutputTokens: 10000,
             thinkingConfig: { thinkingBudget: 8000 },
             responseMimeType: 'application/json',
@@ -59,10 +64,12 @@ export const getDeepAnalysisFeedback = async (transcript: string): Promise<Inter
             }
         }
     });
+    // Access text as a property
     return JSON.parse(response.text || "{}") as InterviewFeedback;
 };
 
 export const calculateResumeStrength = async (resume: ParsedResume): Promise<{ score: number; tips: string[] }> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Analyze this resume and provide a strength score (0-100) and 3 actionable improvement tips. Resume: ${JSON.stringify(resume)}`,
@@ -78,10 +85,12 @@ export const calculateResumeStrength = async (resume: ParsedResume): Promise<{ s
             }
         }
     });
+    // Access text as a property
     return JSON.parse(response.text || '{"score":0, "tips": []}');
 };
 
 export const startLiveInterview = (callbacks: any) => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     return ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-12-2025',
         callbacks,
@@ -96,6 +105,7 @@ export const startLiveInterview = (callbacks: any) => {
 };
 
 export const getChatInstance = (): Chat => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     return ai.chats.create({
         model: 'gemini-3-pro-preview',
         config: {
@@ -106,6 +116,7 @@ export const getChatInstance = (): Chat => {
 }
 
 export const parseResumeWithGemini = async (file: File): Promise<ParsedResume> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const model = 'gemini-3-flash-preview';
   const base64Data = await fileToBase64(file);
   const response = await ai.models.generateContent({
@@ -134,5 +145,6 @@ export const parseResumeWithGemini = async (file: File): Promise<ParsedResume> =
         }
     }
   });
+  // Access text as a property
   return JSON.parse(response.text || "{}") as ParsedResume;
 };

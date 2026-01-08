@@ -1,5 +1,6 @@
 
 import React from 'react';
+// Correct import from react-router-dom for navigation hook
 import { useNavigate } from 'react-router-dom';
 import Card from '../components/Card';
 import { useAuth } from '../hooks/useAuth';

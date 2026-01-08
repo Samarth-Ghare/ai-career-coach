@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
-// Fix: Import useNavigate and Link correctly from react-router-dom
+// Correct imports from react-router-dom for navigation
 import { useNavigate, Link } from 'react-router-dom';
 
 const LoginPage: React.FC = () => {

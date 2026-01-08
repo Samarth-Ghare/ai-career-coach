@@ -1,6 +1,6 @@
 
 import React from 'react';
-// Fix: Import Outlet correctly from react-router-dom
+// Correct import from react-router-dom for Layout component
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
