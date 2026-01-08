@@ -17,8 +17,6 @@ const ProfilePage: React.FC = () => {
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
-  const hasKey = !!process.env.API_KEY;
-
   useEffect(() => {
     if (user?.jobReadiness) {
         setStrengthData({ score: user.resumeStrength || 0, tips: [] });
@@ -28,6 +26,7 @@ const ProfilePage: React.FC = () => {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
       setResumeFile(event.target.files[0]);
+      setError(null);
     }
   };
 
@@ -43,6 +42,7 @@ const ProfilePage: React.FC = () => {
   const handleConnectKey = async () => {
     if (window.aistudio) {
       await window.aistudio.openSelectKey();
+      // Most reliable way to pick up the new project context
       window.location.reload();
     }
   };
@@ -53,11 +53,6 @@ const ProfilePage: React.FC = () => {
       return;
     }
     
-    if (!process.env.API_KEY) {
-      setError('API_KEY_MISSING');
-      return;
-    }
-
     setIsLoading(true);
     setError(null);
     try {
@@ -77,11 +72,11 @@ const ProfilePage: React.FC = () => {
       setTimeout(() => setSaveFeedback(null), 3000);
 
     } catch (err: any) {
-      const msg = err?.message || '';
-      if (msg.includes('API key') || msg.includes('not found')) {
+      console.error("Parse error:", err);
+      if (err.message === 'API_KEY_MISSING') {
         setError('API_KEY_MISSING');
       } else {
-        setError(msg || 'An unknown error occurred.');
+        setError(err.message || 'An unknown error occurred during parsing.');
       }
     } finally {
       setIsLoading(false);
@@ -195,35 +190,42 @@ const ProfilePage: React.FC = () => {
                         />
                         <label htmlFor="resume-upload" className="cursor-pointer block">
                             <i data-lucide="file-text" className="w-12 h-12 text-gray-300 mx-auto mb-3 group-hover:text-primary-500 transition-colors"></i>
-                            <p className="text-xs font-black text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-200 uppercase tracking-widest">{resumeFile ? resumeFile.name : "Select File"}</p>
+                            <p className="text-xs font-black text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-200 uppercase tracking-widest leading-relaxed break-all px-2">
+                                {resumeFile ? resumeFile.name : "Select File (PDF/DOCX)"}
+                            </p>
                         </label>
                     </div>
                     
                     {error === 'API_KEY_MISSING' ? (
-                      <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl text-center space-y-3">
-                          <p className="text-[10px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest">Action Required: API Key Missing</p>
-                          <p className="text-xs text-amber-600 dark:text-amber-500 font-medium">Please connect your Gemini API project to enable AI features.</p>
+                      <div className="p-5 bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-200 dark:border-amber-800 rounded-2xl text-center space-y-4 animate-in fade-in zoom-in">
+                          <p className="text-xs font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest">Action Required: API Key Missing</p>
+                          <p className="text-xs text-amber-600 dark:text-amber-500 font-medium leading-relaxed">Please connect your Gemini API project to enable parsing. You must select a project with billing enabled.</p>
                           <button 
                             onClick={handleConnectKey}
-                            className="w-full py-2.5 bg-amber-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-amber-700 transition-all shadow-md"
+                            className="w-full py-4 bg-amber-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-amber-700 transition-all shadow-lg"
                           >
-                            Connect API Key
+                            CONNECT API KEY
                           </button>
                       </div>
                     ) : (
-                      <button
-                          onClick={handleParseResume}
-                          disabled={isLoading || !resumeFile}
-                          className="w-full py-4 bg-primary-600 text-white font-black rounded-2xl hover:bg-primary-700 disabled:opacity-50 disabled:bg-gray-300 text-xs tracking-widest uppercase flex items-center justify-center transition-all shadow-lg shadow-primary-100 dark:shadow-none"
-                      >
-                          {isLoading ? "ANALYZING..." : "PARSE WITH AI"}
-                      </button>
-                    )}
-                    
-                    {error && error !== 'API_KEY_MISSING' && (
-                      <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-100 dark:border-red-900/40">
-                        <p className="text-center text-[10px] text-red-500 font-black uppercase tracking-widest">{error}</p>
-                        <button onClick={handleConnectKey} className="w-full mt-2 text-[8px] font-black uppercase text-primary-500 hover:underline">Retry with new Key?</button>
+                      <div className="space-y-3">
+                        <button
+                            onClick={handleParseResume}
+                            disabled={isLoading || !resumeFile}
+                            className="w-full py-4 bg-primary-600 text-white font-black rounded-2xl hover:bg-primary-700 disabled:opacity-50 disabled:bg-gray-300 text-xs tracking-widest uppercase flex items-center justify-center transition-all shadow-lg shadow-primary-100 dark:shadow-none"
+                        >
+                            {isLoading ? (
+                                <span className="flex items-center gap-2">
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    ANALYZING...
+                                </span>
+                            ) : "PARSE WITH AI"}
+                        </button>
+                        {error && (
+                            <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-100 dark:border-red-900/40">
+                                <p className="text-center text-[10px] text-red-500 font-black uppercase tracking-widest">{error}</p>
+                            </div>
+                        )}
                       </div>
                     )}
                 </div>

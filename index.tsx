@@ -8,7 +8,8 @@ import App from './App';
 declare global {
   interface Window {
     lucide: any;
-    aistudio: AIStudio;
+    // Making this optional to match existing declarations in the environment
+    aistudio?: AIStudio;
   }
 }
 

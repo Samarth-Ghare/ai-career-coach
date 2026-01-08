@@ -1,6 +1,5 @@
 
-import React, { useEffect } from 'react';
-// Correct imports from react-router-dom for main application routing
+import React, { useEffect, useState } from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './hooks/useAuth';
@@ -20,12 +19,38 @@ import QuizzesPage from './pages/QuizzesPage';
 const AppRoutes: React.FC = () => {
     const { isAuthenticated } = useAuth();
     const location = useLocation();
+    const [isCheckingKey, setIsCheckingKey] = useState(true);
 
     useEffect(() => {
         if(window.lucide) {
             window.lucide.createIcons();
         }
     }, [location.pathname]);
+
+    // Global check for API key on first load
+    useEffect(() => {
+        const checkInitialKey = async () => {
+            if (window.aistudio) {
+                const hasKey = await window.aistudio.hasSelectedApiKey();
+                if (!hasKey && !process.env.API_KEY) {
+                    console.warn("API Key missing. User needs to select a project.");
+                }
+            }
+            setIsCheckingKey(false);
+        };
+        checkInitialKey();
+    }, []);
+
+    if (isCheckingKey) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+                <div className="text-center space-y-4">
+                    <div className="w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    <p className="text-xs font-black uppercase tracking-widest text-gray-400">Initializing AI Environment...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <Routes>

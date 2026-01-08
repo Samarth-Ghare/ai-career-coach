@@ -4,8 +4,24 @@ import { ParsedResume, InterviewQuestion, InterviewFeedback, InterviewField } fr
 import { fileToBase64 } from '../utils/helpers';
 import { STATIC_INTERVIEW_QUESTIONS } from './mockInterviewData';
 
-// Move GoogleGenAI instantiation inside each function to comply with the requirement 
-// of creating a new instance right before making an API call to use the most up-to-date API key.
+// Helper to check if the error is a project/key missing error
+const isKeyNotFoundError = (error: any) => {
+    const message = error?.message || "";
+    return message.includes("Requested entity was not found") || message.includes("API key not found");
+};
+
+// Unified error handler for API calls
+const handleApiError = async (error: any) => {
+    console.error("Gemini API Error:", error);
+    if (isKeyNotFoundError(error)) {
+        if (window.aistudio) {
+            console.warn("Key not found. Triggering project selector...");
+            await window.aistudio.openSelectKey();
+        }
+        throw new Error("API_KEY_MISSING");
+    }
+    throw error;
+};
 
 export const getInterviewPrepData = async (field: InterviewField): Promise<InterviewQuestion[]> => {
     const fieldQuestions = STATIC_INTERVIEW_QUESTIONS.filter(q => q.field === field);
@@ -42,47 +58,55 @@ export const getInterviewPrepData = async (field: InterviewField): Promise<Inter
 };
 
 export const getDeepAnalysisFeedback = async (transcript: string): Promise<InterviewFeedback> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: `Act as a brutal but fair technical interviewer. Analyze this transcript and provide critical feedback: \n\n${transcript}`,
-        config: {
-            maxOutputTokens: 10000,
-            thinkingConfig: { thinkingBudget: 8000 },
-            responseMimeType: 'application/json',
-            responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                    score: { type: Type.NUMBER },
-                    clarity: { type: Type.NUMBER },
-                    relevance: { type: Type.NUMBER },
-                    suggestions: { type: Type.ARRAY, items: { type: Type.STRING } }
-                },
-                required: ['score', 'clarity', 'relevance', 'suggestions']
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-pro-preview',
+            contents: `Act as a brutal but fair technical interviewer. Analyze this transcript and provide critical feedback: \n\n${transcript}`,
+            config: {
+                maxOutputTokens: 10000,
+                thinkingConfig: { thinkingBudget: 8000 },
+                responseMimeType: 'application/json',
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        score: { type: Type.NUMBER },
+                        clarity: { type: Type.NUMBER },
+                        relevance: { type: Type.NUMBER },
+                        suggestions: { type: Type.ARRAY, items: { type: Type.STRING } }
+                    },
+                    required: ['score', 'clarity', 'relevance', 'suggestions']
+                }
             }
-        }
-    });
-    return JSON.parse(response.text || "{}") as InterviewFeedback;
+        });
+        return JSON.parse(response.text || "{}") as InterviewFeedback;
+    } catch (e) {
+        return await handleApiError(e);
+    }
 };
 
 export const calculateResumeStrength = async (resume: ParsedResume): Promise<{ score: number; tips: string[] }> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `Analyze this resume and provide a strength score (0-100) and 3 actionable improvement tips. Resume: ${JSON.stringify(resume)}`,
-        config: {
-            responseMimeType: 'application/json',
-            responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                    score: { type: Type.NUMBER },
-                    tips: { type: Type.ARRAY, items: { type: Type.STRING } }
-                },
-                required: ['score', 'tips']
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: `Analyze this resume and provide a strength score (0-100) and 3 actionable improvement tips. Resume: ${JSON.stringify(resume)}`,
+            config: {
+                responseMimeType: 'application/json',
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        score: { type: Type.NUMBER },
+                        tips: { type: Type.ARRAY, items: { type: Type.STRING } }
+                    },
+                    required: ['score', 'tips']
+                }
             }
-        }
-    });
-    return JSON.parse(response.text || '{"score":0, "tips": []}');
+        });
+        return JSON.parse(response.text || '{"score":0, "tips": []}');
+    } catch (e) {
+        return await handleApiError(e);
+    }
 };
 
 export const startLiveInterview = (callbacks: any) => {
@@ -113,36 +137,41 @@ export const getChatInstance = (): Chat => {
 
 export const parseResumeWithGemini = async (file: File): Promise<ParsedResume> => {
   if (!process.env.API_KEY) {
-    throw new Error("An API Key must be set when running in a browser");
+    throw new Error("API_KEY_MISSING");
   }
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const model = 'gemini-3-flash-preview';
-  const base64Data = await fileToBase64(file);
-  const response = await ai.models.generateContent({
-    model,
-    contents: { parts: [{ inlineData: { mimeType: file.type, data: base64Data } }, { text: "Extract resume JSON. Include location and LinkedIn if present." }] },
-    config: { 
-        responseMimeType: 'application/json', 
-        responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              personalInfo: { 
-                type: Type.OBJECT, 
-                properties: { 
-                    name: { type: Type.STRING }, 
-                    email: { type: Type.STRING }, 
-                    phone: { type: Type.STRING },
-                    location: { type: Type.STRING },
-                    linkedin: { type: Type.STRING }
-                } 
-              },
-              summary: { type: Type.STRING },
-              skills: { type: Type.ARRAY, items: { type: Type.STRING } },
-              experience: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, company: { type: Type.STRING }, duration: { type: Type.STRING }, responsibilities: { type: Type.ARRAY, items: { type: Type.STRING } } } } },
-              education: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { degree: { type: Type.STRING }, institution: { type: Type.STRING }, year: { type: Type.STRING } } } },
+  
+  try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const model = 'gemini-3-flash-preview';
+      const base64Data = await fileToBase64(file);
+      const response = await ai.models.generateContent({
+        model,
+        contents: { parts: [{ inlineData: { mimeType: file.type, data: base64Data } }, { text: "Extract resume JSON. Include location and LinkedIn if present." }] },
+        config: { 
+            responseMimeType: 'application/json', 
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  personalInfo: { 
+                    type: Type.OBJECT, 
+                    properties: { 
+                        name: { type: Type.STRING }, 
+                        email: { type: Type.STRING }, 
+                        phone: { type: Type.STRING },
+                        location: { type: Type.STRING },
+                        linkedin: { type: Type.STRING }
+                    } 
+                  },
+                  summary: { type: Type.STRING },
+                  skills: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  experience: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, company: { type: Type.STRING }, duration: { type: Type.STRING }, responsibilities: { type: Type.ARRAY, items: { type: Type.STRING } } } } },
+                  education: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { degree: { type: Type.STRING }, institution: { type: Type.STRING }, year: { type: Type.STRING } } } },
+                }
             }
         }
-    }
-  });
-  return JSON.parse(response.text || "{}") as ParsedResume;
+      });
+      return JSON.parse(response.text || "{}") as ParsedResume;
+  } catch (e) {
+      return await handleApiError(e);
+  }
 };
